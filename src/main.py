@@ -22,13 +22,13 @@ async def home():
     return "Hello"
 
 
-@app.post("/auth/", status_code=200)
+@app.post("/api/auth/", status_code=200)
 async def auth(user: User):
     logging.info(f"[{user.username}] Get user auth data")
 
     with open("data/users_auth_data.yaml") as file:
         read_data = yaml.load(file, Loader=yaml.FullLoader)
-        logging.info(f"[{user.username}] Successful get user data")
+        logging.info(f"[{user.username}] Successful get users data")
 
         if user.username in read_data['users']:
             logging.info(f"[{user.username}] User has an account")
@@ -45,7 +45,7 @@ async def auth(user: User):
     return user
 
 
-@app.post("/reg/", status_code=200)
+@app.post("/api/reg/", status_code=200)
 async def add_account(user: User):
     logging.info(f"Create new user/admin")
     with open("data/users_auth_data.yaml", 'r+') as file:
@@ -75,3 +75,10 @@ async def add_account(user: User):
         logging.info(f"Successful save user data to file")
 
     return JSONResponse(content={"message": "The user has been successfully added"}, status_code=200)
+
+
+@app.get("/api/admin/all_users")
+async def get_all_users():  # Проверка на токен в будущем
+    with open("data/users_auth_data.yaml") as file:
+        read_data = yaml.load(file, Loader=yaml.FullLoader)
+        return read_data['users']
