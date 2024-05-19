@@ -1,10 +1,13 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Header, Response
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import Annotated
 import secrets
 import yaml
 from src.logger import Logger
 import logging
+import cv2
 
 
 class User(BaseModel):
@@ -14,16 +17,28 @@ class User(BaseModel):
     token: str | None = None
 
 
+class Message(BaseModel):
+    message: str
+
+
 logger = Logger()
 app = FastAPI()
+app.add_middleware(CORSMiddleware,
+                   allow_origins=["*"],
+                   allow_credentials=True,
+                   allow_methods=["*"],
+                   allow_headers=["*"])
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
+    with open("data/img.png", "rb") as image:
+        byte_image = image.read()
     while True:
         data = await websocket.receive_text()
-        await websocket.send_text(f"Message received: {data}")
+        # await websocket.send_text(f"Message received: {data}")
+        await websocket.send_bytes(byte_image)
 
 
 @app.get("/")
@@ -31,7 +46,7 @@ async def home():
     return "Hello"
 
 
-@app.post("/api/auth/", status_code=200)
+@app.post("/api/auth/", responses={409: {"description": "Incorrect data"}})
 async def auth(user: User):
     logging.info(f"[{user.username}] Get user auth data")
 
@@ -43,15 +58,37 @@ async def auth(user: User):
             logging.info(f"[{user.username}] User has an account")
 
             auth_user = read_data['users'][user.username]
-            if user.password == str(auth_user['password']):
+            if str(user.password) == str(auth_user['password']):
                 logging.info(f"[{user.username}] Password was entered correctly")
                 logging.info(f"[{user.username}] Returning the authorization token to the user")
                 return auth_user['token']
             else:
                 logging.info(f"[{user.username}] Password was entered incorrectly")
+                return Response("Password was entered incorrectly", status_code=409)
         else:
             logging.info(f"[{user.username}] User is not registered")
-    return user
+            return Response("User is not registered", status_code=409)
+
+
+@app.get("/api/check-role")
+async def check_role(token: Annotated[str, Header()]):
+    logging.info(f"[{token}] Check role by token")
+
+    with open("data/users_auth_data.yaml") as file:
+        read_data = yaml.load(file, Loader=yaml.FullLoader)
+
+        logging.info(f"Checking all users")
+        for i in read_data['users']:
+            logging.info(f"Checking user [{i}]")
+            if token == read_data['users'][i]['token']:
+                role = read_data['users'][i]['role']
+                logging.info(f"[{i}] User has been found. Role - {role}")
+                return role
+            else:
+                logging.info(f"Token does not match")
+
+        logging.info(f"The token does not exist in the system")
+        return "The token does not exist in the system"
 
 
 @app.post("/api/reg/", status_code=200)
@@ -134,14 +171,6 @@ async def edit_user(user: User):
         logging.info(f"Successful save user data to file")
 
         return JSONResponse(content={"message": "User's data has been successfully changed"}, status_code=200)
-
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    while True:
-        data = await websocket.receive_text()
-        await websocket.send_text(f"Message text was: {data}")
 
 
 @app.get("/video")
