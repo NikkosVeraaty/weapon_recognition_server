@@ -1,5 +1,5 @@
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, WebSocket
+from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
 import secrets
 import yaml
@@ -16,6 +16,14 @@ class User(BaseModel):
 
 logger = Logger()
 app = FastAPI()
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+        await websocket.send_text(f"Message received: {data}")
 
 
 @app.get("/")
@@ -87,17 +95,24 @@ async def get_all_users():  # Проверка на токен в будущем
 
 @app.post("/api/admin/users/edit")
 async def edit_user(user: User):
+    logging.info(f"Edit user/admin data")
+
+    logging.info(f"Reading user/admin data from file")
     with open("data/users_auth_data.yaml", "r+") as file:
         read_data = yaml.load(file, Loader=yaml.FullLoader)
+        logging.info(f"Successful reading user/admin data from file")
 
         if user.role not in read_data['roles']:
+            logging.error(f"Error in the selected role status_code #400")
             return JSONResponse(content={"message": "Error in the selected role"}, status_code=400)
         elif any(user.username in el.keys() and
                  user.token != list(el.values())[0]['token'] for el in read_data['users']):
+            logging.error(f"Login already exists status_code #409")
             return JSONResponse(content={"message": "Login already exists"}, status_code=409)
 
         users = read_data["users"]
         updated_users = []
+        logging.info(f"Redact user data")
         for i in users:
             if user.token == list(i.values())[0]['token']:
                 new_user = {user.username: {
@@ -119,3 +134,17 @@ async def edit_user(user: User):
         logging.info(f"Successful save user data to file")
 
         return JSONResponse(content={"message": "User's data has been successfully changed"}, status_code=200)
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    while True:
+        data = await websocket.receive_text()
+        await websocket.send_text(f"Message text was: {data}")
+
+
+@app.get("/video")
+async def get_video():
+    video_path = "video/video.mp4"
+    return FileResponse(video_path)
