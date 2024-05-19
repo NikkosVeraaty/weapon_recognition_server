@@ -8,6 +8,7 @@ import yaml
 from src.logger import Logger
 import logging
 import cv2
+import asyncio
 
 
 class User(BaseModel):
@@ -33,12 +34,18 @@ app.add_middleware(CORSMiddleware,
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    with open("data/img.png", "rb") as image:
-        byte_image = image.read()
+
     while True:
         data = await websocket.receive_text()
         # await websocket.send_text(f"Message received: {data}")
-        await websocket.send_bytes(byte_image)
+        cap = cv2.VideoCapture('video/video.mp4')
+        while cap.isOpened():
+            await asyncio.sleep(0.02)
+            ret, frame = cap.read()
+            if not ret:
+                break
+            ret, buffer = cv2.imencode('.jpg', frame)
+            await websocket.send_bytes(buffer.tobytes())
 
 
 @app.get("/")
