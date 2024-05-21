@@ -1,51 +1,27 @@
 from fastapi import FastAPI, WebSocket, Header, Response
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from src.schemas import User
 from typing import Annotated
 import secrets
 import yaml
 from src.logger import Logger
+from src.websockets import cameras
 import logging
 import cv2
 import asyncio
 
 
-class User(BaseModel):
-    username: str
-    password: str
-    role: str | None = None
-    token: str | None = None
-
-
-class Message(BaseModel):
-    message: str
-
-
 logger = Logger()
 app = FastAPI()
+app.include_router(cameras.router)
+
+# noinspection PyTypeChecker
 app.add_middleware(CORSMiddleware,
                    allow_origins=["*"],
                    allow_credentials=True,
                    allow_methods=["*"],
                    allow_headers=["*"])
-
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-
-    while True:
-        data = await websocket.receive_text()
-        # await websocket.send_text(f"Message received: {data}")
-        cap = cv2.VideoCapture('video/video.mp4')
-        while cap.isOpened():
-            await asyncio.sleep(0.02)
-            ret, frame = cap.read()
-            if not ret:
-                break
-            ret, buffer = cv2.imencode('.jpg', frame)
-            await websocket.send_bytes(buffer.tobytes())
 
 
 @app.get("/")
@@ -184,3 +160,6 @@ async def edit_user(user: User):
 async def get_video():
     video_path = "video/video.mp4"
     return FileResponse(video_path)
+
+# if __name__ == "__main__":
+#     uvicorn.run("src.main:app", port=5000, log_level="info")
