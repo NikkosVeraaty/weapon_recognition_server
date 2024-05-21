@@ -1,7 +1,7 @@
 from fastapi import FastAPI, WebSocket, Header, Response
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from src.schemas import User
+from src.schemas import UserBase, UserCreate
 from typing import Annotated
 import secrets
 import yaml
@@ -29,26 +29,37 @@ async def home():
 
 
 @app.post("/api/auth/", responses={409: {"description": "Incorrect data"}})
-async def auth(user: User):
+async def auth(user: UserBase):
     logging.info(f"[{user.username}] Get user auth data")
 
-    with open("data/users_auth_data.yaml") as file:
-        read_data = yaml.load(file, Loader=yaml.FullLoader)
-        logging.info(f"[{user.username}] Successful get users data")
+    with sqlite3.connect('data/db/weapon_rec_database.db') as conn:
+        cur = conn.cursor()
 
-        if user.username in read_data['users']:
+        cur.execute("SELECT EXISTS(SELECT 1 FROM Пользователь WHERE Логин = ?)", (user.username,))
+
+        if cur.fetchone()[0] == 1:
             logging.info(f"[{user.username}] User has an account")
 
-            auth_user = read_data['users'][user.username]
-            if str(user.password) == str(auth_user['password']):
+            cur.execute("SELECT Пароль FROM Пользователь WHERE Логин = ?", (user.username,))
+            if str(user.password) == str(cur.fetchone()[0]):
                 logging.info(f"[{user.username}] Password was entered correctly")
                 logging.info(f"[{user.username}] Returning the authorization token to the user")
-                return auth_user['token']
+
+                cur.execute("SELECT Токен FROM Пользователь WHERE Логин = ?", (user.username,))
+                token = cur.fetchone()[0]
+
+                cur.close()
+                conn.commit()
+                return token
             else:
                 logging.info(f"[{user.username}] Password was entered incorrectly")
+                cur.close()
+                conn.commit()
                 return Response("Password was entered incorrectly", status_code=409)
         else:
             logging.info(f"[{user.username}] User is not registered")
+            cur.close()
+            conn.commit()
             return Response("User is not registered", status_code=409)
 
 
@@ -56,25 +67,28 @@ async def auth(user: User):
 async def check_role(token: Annotated[str, Header()]):
     logging.info(f"[{token}] Check role by token")
 
-    with open("data/users_auth_data.yaml") as file:
-        read_data = yaml.load(file, Loader=yaml.FullLoader)
+    with sqlite3.connect('data/db/weapon_rec_database.db') as conn:
+        cur = conn.cursor()
 
         logging.info(f"Checking all users")
-        for i in read_data['users']:
-            logging.info(f"Checking user [{i}]")
-            if token == read_data['users'][i]['token']:
-                role = read_data['users'][i]['role']
-                logging.info(f"[{i}] User has been found. Role - {role}")
-                return role
-            else:
-                logging.info(f"Token does not match")
 
-        logging.info(f"The token does not exist in the system")
-        return "The token does not exist in the system"
+        cur.execute("SELECT Пользователь.Логин, Роль.Роль FROM Роль JOIN Пользователь ON Пользователь.Роль = Роль.id "
+                    "WHERE Пользователь.Токен = ?", (token,))
+        result = cur.fetchone()
+        if result:
+            logging.info(f"[{result[0]}] User has been found. Role - {result[1]}")  # [0] - login, [1] - role
+            cur.close()
+            conn.commit()
+            return result[1]
+        else:
+            logging.info(f"The token does not exist in the system")
+            cur.close()
+            conn.commit()
+            return "The token does not exist in the system"
 
 
 @app.post("/api/reg/", status_code=200)
-async def add_account(user: User):
+async def add_account(user: UserCreate):
     logging.info(f"Create new user/admin")
     with open("data/users_auth_data.yaml", 'r+') as file:
         read_data = yaml.load(file, Loader=yaml.FullLoader)
@@ -113,7 +127,7 @@ async def get_all_users():  # Проверка на токен в будущем
 
 
 @app.post("/api/admin/users/edit")
-async def edit_user(user: User):
+async def edit_user(user: UserBase):
     logging.info(f"Edit user/admin data")
 
     logging.info(f"Reading user/admin data from file")
