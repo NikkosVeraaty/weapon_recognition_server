@@ -8,8 +8,7 @@ import yaml
 from src.logger import Logger
 from src.websockets import cameras
 import logging
-import cv2
-import asyncio
+import sqlite3
 
 
 logger = Logger()
@@ -86,7 +85,7 @@ async def add_account(user: User):
             return JSONResponse(content={"message": "Login already exists"}, status_code=409)
 
         logging.info(f"Generate new token")
-        token = secrets.token_urlsafe(32)
+        token = secrets.token_urlsafe(45)
         logging.info(f"Successful generate new token")
 
         acc = {
