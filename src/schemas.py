@@ -1,11 +1,24 @@
 from pydantic import BaseModel
 
 
-class User(BaseModel):
-    username: str
+class UserBase(BaseModel):
+    login: str
     password: str
-    role: str | None = None
-    token: str | None = None
+
+
+class UserEdit(UserBase):
+    id: int
+    role: str
+    email: str
+    phone: str
+
+
+class UserCreate(UserEdit):
+    name: str
+    lastname: str
+    patronymic: str
+    birthdate: str
+    sex: str
 
 
 class Message(BaseModel):
