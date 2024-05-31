@@ -2,6 +2,5 @@
 venv
 *__pycache__/
 logs
-data/users_auth_data.yaml
 video
 test*py

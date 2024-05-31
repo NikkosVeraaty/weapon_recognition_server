@@ -6,14 +6,11 @@ class UserBase(BaseModel):
     password: str
 
 
-class UserEdit(UserBase):
+class User(UserBase):
     id: int
     role: str
     email: str
     phone: str
-
-
-class UserCreate(UserEdit):
     name: str
     lastname: str
     patronymic: str
