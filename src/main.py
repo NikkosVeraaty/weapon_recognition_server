@@ -1,15 +1,13 @@
-from fastapi import FastAPI, WebSocket, Header, Response
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi import FastAPI, Header, Response
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from src.schemas import UserBase, UserCreate, UserEdit
+from src.schemas import UserBase, User
 from typing import Annotated
 import secrets
-import yaml
 from src.logger import Logger
 from src.websockets import cameras
 import logging
 import sqlite3
-
 
 logger = Logger()
 app = FastAPI()
@@ -98,8 +96,9 @@ async def get_all_users(token: Annotated[str, Header()]):  # Проверка н
         with sqlite3.connect('data/db/weapon_rec_database.db') as conn:
             cur = conn.cursor()
 
-            cur.execute("""SELECT Пользователь.id, Пользователь.Логин, Пользователь.Телефон, Пользователь.Почта, 
-                        Пользователь.Пароль, Роль.Роль
+            cur.execute("""SELECT Пользователь.id, Пользователь.Имя, Пользователь.Фамилия, Пользователь.Отчество, 
+                        Пользователь.Дата_рождения, Пользователь.Пол,
+                        Пользователь.Логин, Пользователь.Телефон, Пользователь.Почта, Пользователь.Пароль, Роль.Роль
                         FROM Пользователь JOIN Роль ON Пользователь.Роль = Роль.id
                         """)
             result = cur.fetchall()
@@ -107,11 +106,16 @@ async def get_all_users(token: Annotated[str, Header()]):  # Проверка н
             new_res = []
             for i in result:
                 new_res.append({"id": i[0],
-                                "login": i[1],
-                                "phone": i[2],
-                                "email": i[3],
-                                "password": i[4],
-                                "role": i[5]})
+                                "name": i[1],
+                                "lastname": i[2],
+                                "patronymic": i[3],
+                                "birthdate": i[4],
+                                "sex": i[5],
+                                "login": i[6],
+                                "phone": i[7],
+                                "email": i[8],
+                                "password": i[9],
+                                "role": i[10]})
 
             return JSONResponse(content=new_res, status_code=200)
     else:
@@ -119,7 +123,7 @@ async def get_all_users(token: Annotated[str, Header()]):  # Проверка н
 
 
 @app.post("/api/admin/users/edit")
-async def edit_user(user: UserEdit, token: Annotated[str, Header()]):
+async def edit_user(user: User, token: Annotated[str, Header()]):
     logging.info(f"[{user.login}] Edit user data")
 
     res = check_role_from_db(token)
@@ -131,9 +135,10 @@ async def edit_user(user: UserEdit, token: Annotated[str, Header()]):
 
             try:
                 logging.info(f"[{user.login}] Recording data: {user}")
-                cur.execute("UPDATE Пользователь SET Логин = ?, Пароль = ?, Роль = ?, Почта = ?, Телефон = ? "
-                            "WHERE id == ?",
-                            (user.login, user.password, role, user.email, user.phone, user.id))
+                cur.execute("UPDATE Пользователь SET Логин = ?, Пароль = ?, Роль = ?, Почта = ?, Телефон = ?, "
+                            "Имя = ?, Фамилия = ?, Отчество = ?, Дата_рождения = ?, Пол = ?"
+                            "WHERE id == ?", (user.login, user.password, role, user.email, user.phone, user.name,
+                                              user.lastname, user.patronymic, user.birthdate, user.sex, user.id))
 
                 logging.info(f"[{user.login}] Successful edit user data")
                 return Response(status_code=200)
@@ -146,7 +151,7 @@ async def edit_user(user: UserEdit, token: Annotated[str, Header()]):
 
 
 @app.post("/api/reg/", status_code=200)
-async def add_account(user: UserCreate, token: Annotated[str, Header()]):
+async def add_account(user: User, token: Annotated[str, Header()]):
     logging.info(f"Create new user")
 
     res = check_role_from_db(token)
