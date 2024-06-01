@@ -4,3 +4,5 @@ venv
 logs
 video
 test*py
+data/tables_templates
+data/db/*.json
