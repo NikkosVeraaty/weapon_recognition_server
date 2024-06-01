@@ -2,6 +2,7 @@ from fastapi import FastAPI, Header, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from src.schemas import UserBase, User
+from src.routers.cameras import router
 from typing import Annotated
 import secrets
 from src.logger import Logger
@@ -12,6 +13,7 @@ import sqlite3
 logger = Logger()
 app = FastAPI()
 app.include_router(cameras.router)
+app.include_router(router)
 
 # noinspection PyTypeChecker
 app.add_middleware(CORSMiddleware,
@@ -150,7 +152,7 @@ async def edit_user(user: User, token: Annotated[str, Header()]):
         return Response("Don't have enough rights", status_code=403)
 
 
-@app.post("/api/reg/", status_code=200)
+@app.post("/api/admin/users/create", status_code=200)
 async def add_account(user: User, token: Annotated[str, Header()]):
     logging.info(f"Create new user")
 

@@ -7,7 +7,7 @@ class UserBase(BaseModel):
 
 
 class User(UserBase):
-    id: int
+    id: int | None
     role: str
     email: str
     phone: str
