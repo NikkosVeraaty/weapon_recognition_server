@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Header, Response
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from src.schemas import UserBase, User
 from src.routers.cameras import router
@@ -93,7 +93,7 @@ async def get_all_users(token: Annotated[str, Header()]):  # Проверка н
 
     res = check_role_from_db(token)
 
-    if res:
+    if res == "admin":
         logging.info(f"Find information [DB]")
         with sqlite3.connect('data/db/weapon_rec_database.db') as conn:
             cur = conn.cursor()
@@ -119,6 +119,8 @@ async def get_all_users(token: Annotated[str, Header()]):  # Проверка н
                                 "password": i[9],
                                 "role": i[10]})
 
+            cur.close()
+            conn.commit()
             return JSONResponse(content=new_res, status_code=200)
     else:
         return Response("Don't have enough rights", status_code=403)
@@ -129,7 +131,7 @@ async def edit_user(user: User, token: Annotated[str, Header()]):
     logging.info(f"[{user.login}] Edit user data")
 
     res = check_role_from_db(token)
-    if res:
+    if res == "admin":
         with sqlite3.connect('data/db/weapon_rec_database.db') as conn:
             cur = conn.cursor()
 
@@ -143,11 +145,14 @@ async def edit_user(user: User, token: Annotated[str, Header()]):
                                               user.lastname, user.patronymic, user.birthdate, user.sex, user.id))
 
                 logging.info(f"[{user.login}] Successful edit user data")
+                cur.close()
+                conn.commit()
                 return Response(status_code=200)
             except sqlite3.DatabaseError as e:
                 logging.error(f"[{user.login}] Database exception: {e}")
+                cur.close()
+                conn.commit()
                 return Response(status_code=502)
-
     else:
         return Response("Don't have enough rights", status_code=403)
 
@@ -157,7 +162,7 @@ async def add_account(user: User, token: Annotated[str, Header()]):
     logging.info(f"Create new user")
 
     res = check_role_from_db(token)
-    if res:
+    if res == "admin":
 
         with sqlite3.connect('data/db/weapon_rec_database.db') as conn:
             cur = conn.cursor()
@@ -175,11 +180,138 @@ async def add_account(user: User, token: Annotated[str, Header()]):
                             """, (user.birthdate, user.name, user.login, user.patronymic, user.password,
                                   user.sex, user.email, role, user.phone, token, user.lastname))
                 logging.info(f"Successful adding new user to DB")
+                cur.close()
+                conn.commit()
                 return Response("The user has been successfully created", status_code=200)
 
             except sqlite3.DatabaseError as e:
                 logging.error(f"Database exception: {e}")
+                cur.close()
+                conn.commit()
                 return Response("Database server error", status_code=502)
+    else:
+        return Response("Don't have enough rights", status_code=403)
+
+
+@app.get("/api/admin/users/create/check_login")
+async def check_login_exist(login: str, token: Annotated[str, Header()]):
+    logging.info(f"Checking the existence of a login")
+
+    res = check_role_from_db(token)
+    if res == 'admin':
+        with sqlite3.connect('data/db/weapon_rec_database.db') as conn:
+            logging.info(f"Successful connection to the database")
+            cur = conn.cursor()
+
+            try:
+                cur.execute("SELECT Логин FROM Пользователь")
+                result = cur.fetchall()
+                logging.info(f"Successfully get all logins")
+
+                if any([login in i for i in result]):
+                    cur.close()
+                    conn.commit()
+                    return Response("false", status_code=200)
+                else:
+                    cur.close()
+                    conn.commit()
+                    return Response("true", status_code=200)
+
+            except sqlite3.DatabaseError as e:
+                logging.error(f"Database exception: {e}")
+                cur.close()
+                conn.commit()
+                return Response(status_code=502)
+    else:
+        return Response("Don't have enough rights", status_code=403)
+
+
+@app.get("/api/records/get_all")
+async def get_all_records_metadata(token: Annotated[str, Header()]):
+    logging.info(f"Get all records metadata")
+
+    res = check_role_from_db(token)
+    if res == 'admin':
+        with sqlite3.connect('data/db/weapon_rec_database.db') as conn:
+            logging.info(f"Successful connection to the database")
+            cur = conn.cursor()
+
+            try:
+                cur.execute("""SELECT id, Завершение_записи, Камера FROM Записи 
+                            WHERE Начало_записи >= date('now', '-1 month')""")
+                result = cur.fetchall()
+                logging.info(f"Successfully get all records")
+
+                response = []
+                for row in result:
+                    response.append({'id': row[0], 'date': row[1], 'camera_id': row[2]})
+
+                cur.close()
+                conn.commit()
+                return JSONResponse(content=response, status_code=200)
+
+            except sqlite3.DatabaseError as e:
+                logging.error(f"Database exception: {e}")
+                cur.close()
+                conn.commit()
+                return Response(status_code=502)
+    else:
+        return Response("Don't have enough rights", status_code=403)
+
+
+@app.get("/api/records/get")
+async def get_record_by_id(record_id: int, token: Annotated[str, Header()]):
+    logging.info(f"Get record by id")
+
+    res = check_role_from_db(token)
+
+    if res == 'admin':
+        with sqlite3.connect('data/db/weapon_rec_database.db') as conn:
+            logging.info(f"Successful connection to the database")
+            cur = conn.cursor()
+
+            try:
+                cur.execute("SELECT Путь_до_записи FROM Записи WHERE id == ?", (record_id,))
+                result = cur.fetchall()
+                logging.info(f"Successfully get record")
+
+                cur.close()
+                conn.commit()
+                return FileResponse(path=result[0][0], status_code=200)
+
+            except sqlite3.DatabaseError as e:
+                logging.error(f"Database exception: {e}")
+                cur.close()
+                conn.commit()
+                return Response(status_code=502)
+    else:
+        return Response("Don't have enough rights", status_code=403)
+
+
+@app.delete('/api/records/delete')
+async def delete_record(record_id: int, token: Annotated[str, Header()]):
+    logging.info(f"Delete record by id start")
+
+    res = check_role_from_db(token)
+
+    if res == 'admin':
+        with sqlite3.connect('data/db/weapon_rec_database.db') as conn:
+            logging.info(f"Successful connection to the database")
+            cur = conn.cursor()
+
+            try:
+                cur.execute("DELETE FROM Записи WHERE id = ?", (record_id,))
+                logging.info(f"Successfully delete record")
+
+                cur.close()
+                conn.commit()
+                return Response(status_code=200)
+
+            except sqlite3.DatabaseError as e:
+                logging.error(f"Database exception: {e}")
+                cur.close()
+                conn.commit()
+                return Response(status_code=502)
     else:
         return Response("Don't have enough rights", status_code=403)
 
