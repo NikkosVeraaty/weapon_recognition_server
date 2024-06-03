@@ -4,11 +4,11 @@ from src.schemas import UserBase
 from src.routers.cameras import router
 from src.routers.admin import admin
 from src.inspector import check_role_from_db
+from src.db.session import conn
 from typing import Annotated
 from src.logger import Logger
 from src.websockets import cameras
 import logging
-import sqlite3
 
 logger = Logger()
 app = FastAPI()
@@ -33,35 +33,34 @@ async def home():
 async def auth(user: UserBase):
     logging.info(f"[{user.login}] Get user auth data")
 
-    with sqlite3.connect('data/db/weapon_rec_database.db') as conn:
-        cur = conn.cursor()
+    cur = conn.cursor()
 
-        cur.execute("SELECT EXISTS(SELECT 1 FROM Пользователь WHERE Логин = ?)", (user.login,))
+    cur.execute("SELECT EXISTS(SELECT 1 FROM Пользователь WHERE Логин = ?)", (user.login,))
 
-        if cur.fetchone()[0] == 1:
-            logging.info(f"[{user.login}] User has an account")
+    if cur.fetchone()[0] == 1:
+        logging.info(f"[{user.login}] User has an account")
 
-            cur.execute("SELECT Пароль FROM Пользователь WHERE Логин = ?", (user.login,))
-            if str(user.password) == str(cur.fetchone()[0]):
-                logging.info(f"[{user.login}] Password was entered correctly")
-                logging.info(f"[{user.login}] Returning the authorization token to the user")
+        cur.execute("SELECT Пароль FROM Пользователь WHERE Логин = ?", (user.login,))
+        if str(user.password) == str(cur.fetchone()[0]):
+            logging.info(f"[{user.login}] Password was entered correctly")
+            logging.info(f"[{user.login}] Returning the authorization token to the user")
 
-                cur.execute("SELECT Токен FROM Пользователь WHERE Логин = ?", (user.login,))
-                token = cur.fetchone()[0]
+            cur.execute("SELECT Токен FROM Пользователь WHERE Логин = ?", (user.login,))
+            token = cur.fetchone()[0]
 
-                cur.close()
-                conn.commit()
-                return token
-            else:
-                logging.info(f"[{user.login}] Password was entered incorrectly")
-                cur.close()
-                conn.commit()
-                return Response("Password was entered incorrectly", status_code=409)
-        else:
-            logging.info(f"[{user.login}] User is not registered")
             cur.close()
             conn.commit()
-            return Response("User is not registered", status_code=409)
+            return token
+        else:
+            logging.info(f"[{user.login}] Password was entered incorrectly")
+            cur.close()
+            conn.commit()
+            return Response("Password was entered incorrectly", status_code=409)
+    else:
+        logging.info(f"[{user.login}] User is not registered")
+        cur.close()
+        conn.commit()
+        return Response("User is not registered", status_code=409)
 
 
 @app.get("/api/check-role")

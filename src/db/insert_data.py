@@ -124,6 +124,28 @@ def insert_records(cur):
         ''', records)
 
 
+def insert_record(cur):
+    records = ('6',
+               'C:\\Users\\hainc\\Desktop\\ВКР\\server\\video\\records\\camera6_24_05-2.mp4',
+               '2024-05-24T21:09:14',
+               '2024-05-34T21:11:24',
+               '130',
+               '30',
+               '75',)
+
+    cur.execute('''
+            INSERT INTO Записи (Камера, Путь_до_записи, Начало_записи, Завершение_записи, 
+            Длительность, Частота_кадров, Размер_записи)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', records)
+
+
+def update_record(cur):
+
+    cur.execute('''
+            UPDATE Записи SET Камера = 5 WHERE id = 22''')
+
+
 def insert_cameras_session(cur):
     with open("../../data/db/cameras_seans.json", encoding='utf-8') as f:
         data = json.loads(f.read())
@@ -157,7 +179,8 @@ def main():
     conn = sqlite3.connect('../../data/db/weapon_rec_database.db')
     cur = conn.cursor()
 
-    insert_notification(cur)
+    insert_record(cur)
+    # update_record(cur)
 
     cur.close()
     conn.commit()
