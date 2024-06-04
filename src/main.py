@@ -24,12 +24,12 @@ app.add_middleware(CORSMiddleware,
                    allow_headers=["*"])
 
 
-@app.get("/")
+@app.get("/", tags=['Common'])
 async def home():
     return "Hello"
 
 
-@app.post("/api/auth/", responses={409: {"description": "Incorrect data"}})
+@app.post("/api/auth/", responses={409: {"description": "Incorrect data"}}, tags=['Common'])
 async def auth(user: UserBase):
     logging.info(f"[{user.login}] Get user auth data")
 
@@ -63,7 +63,7 @@ async def auth(user: UserBase):
         return Response("User is not registered", status_code=409)
 
 
-@app.get("/api/check-role")
+@app.get("/api/check-role", tags=['Common'])
 async def check_role(token: Annotated[str, Header()]):
     logging.info(f"[{token}] Check role by token")
 

@@ -1,0 +1,14 @@
+parameters:
+  conf: 0.2
+  iou: 0.2
+  device: cpu
+  max_det: 300
+  classes:
+    pistol: True
+    rifle: False
+    pp: False
+    shotgun: False
+    cold_weapon: True
+    machinegun: False
+  save_crop: False
+  line_width: 1

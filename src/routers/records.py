@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Header
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from src.inspector import check_role_from_db
 from src.db.session import conn
 from typing import Annotated
@@ -58,7 +58,7 @@ async def get_all_records_metadata(token: Annotated[str, Header()]):
         return Response("Don't have enough rights", status_code=403)
 
 
-@records.get("/get")
+@records.get("/get", response_class=StreamingResponse)
 async def get_record_by_id(record_id: int, token: Annotated[str, Header()]):
     logging.info(f"Get record by id")
 
@@ -73,13 +73,14 @@ async def get_record_by_id(record_id: int, token: Annotated[str, Header()]):
             result = cur.fetchall()
             logging.info(f"Successfully get record")
 
-            with open(result[0][0], "rb") as video_file:
-                video_bytes = video_file.read()
+            def iter_file():
+                with open(result[0][0], mode="rb") as video_file:
+                    yield from video_file
 
             cur.close()
             conn.commit()
             # return FileResponse(path=result[0][0], status_code=200)
-            return Response(content=str(video_bytes))
+            return StreamingResponse(iter_file(), media_type="video/mp4")
 
         except sqlite3.DatabaseError as e:
             logging.error(f"Database exception: {e}")

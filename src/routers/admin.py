@@ -2,6 +2,7 @@ from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse, Response
 from src.schemas import User
 from src.routers.records import records
+from src.routers.neural_network import network
 from src.inspector import check_role_from_db
 from src.db.session import conn
 from typing import Annotated
@@ -12,6 +13,7 @@ import sqlite3
 
 admin = APIRouter(prefix='/api/admin', tags=['Admin'])
 admin.include_router(records)
+admin.include_router(network)
 
 
 @admin.get("/users/get")
