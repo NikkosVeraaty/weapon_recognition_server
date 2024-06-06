@@ -73,3 +73,15 @@ async def check_role(token: Annotated[str, Header()]):
         return result
     else:
         return "The token does not exist in the system"
+
+
+@app.get("/custom_response")
+async def custom_response():
+    data = {"key": "value"}
+    byte_data = b"Your byte data here"
+
+    response = Response(content=byte_data)
+    response.headers["Content-Type"] = "application/octet-stream"  # Устанавливаем тип содержимого для байтовых данных
+    response.media = data  # Добавляем JSON объект в атрибут media объекта Response
+
+    return response

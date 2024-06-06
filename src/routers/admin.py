@@ -6,6 +6,7 @@ from src.routers.neural_network import network
 from src.inspector import check_role_from_db
 from src.db.session import conn
 from typing import Annotated
+import datetime
 import logging
 import secrets
 import sqlite3
@@ -152,5 +153,20 @@ async def check_login_exist(login: str, token: Annotated[str, Header()]):
             cur.close()
             conn.commit()
             return Response(status_code=502)
+    else:
+        return Response("Don't have enough rights", status_code=403)
+
+
+@admin.get("/logs/get")
+async def get_logs(token: Annotated[str, Header()]):
+    logging.info(f"Get logs")
+
+    res = check_role_from_db(token)
+    if res == 'admin':
+        now = datetime.datetime.now()
+        name = f"log_{now.year}-{'%02d' % now.month}-{'%02d' % now.day}.log"
+        with open(f'logs/{name}') as file:
+            data = file.readlines()
+        return Response(content=''.join(data[:-4]), status_code=200)
     else:
         return Response("Don't have enough rights", status_code=403)

@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Header
-from fastapi.responses import JSONResponse, Response, StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from src.inspector import check_role_from_db
 from src.db.session import conn
 from typing import Annotated
 import logging
 import cv2
 import sqlite3
+import base64
 
 
 records = APIRouter(prefix='/records')
@@ -32,10 +33,11 @@ async def get_all_records_metadata(token: Annotated[str, Header()]):
                 ret, frame = cap.read()
                 if ret:
                     ret, buffer = cv2.imencode('.jpg', frame)
+                    encoded_image = base64.b64encode(buffer.tobytes())
                     response.append({
                         'id': row[0],
                         'date': row[1],
-                        'preview': str(buffer.tobytes()),
+                        'preview': encoded_image,
                         'camera_id': row[2]})
                 else:
                     response.append({
@@ -46,7 +48,7 @@ async def get_all_records_metadata(token: Annotated[str, Header()]):
 
             cur.close()
             conn.commit()
-            return JSONResponse(content=response, status_code=200)
+            return response
 
         except sqlite3.DatabaseError as e:
             logging.error(f"Database exception: {e}")
@@ -79,7 +81,6 @@ async def get_record_by_id(record_id: int, token: Annotated[str, Header()]):
 
             cur.close()
             conn.commit()
-            # return FileResponse(path=result[0][0], status_code=200)
             return StreamingResponse(iter_file(), media_type="video/mp4")
 
         except sqlite3.DatabaseError as e:

@@ -37,9 +37,8 @@ async def get_parameters(token: Annotated[str, Header()]):
     if res == "admin":
         with open('data/config_nn.yaml', 'r') as yaml_file:
             params = yaml.safe_load(yaml_file)
-            print(params)
+
             params_json = json.dumps(params)
-            print(params_json)
 
         return JSONResponse(json.loads(params_json), status_code=200)
     else:
