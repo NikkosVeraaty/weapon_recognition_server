@@ -23,3 +23,6 @@ def check_role_from_db(token):
         cur.close()
         conn.commit()
         return False
+
+
+# def add_auth_data_to_db()

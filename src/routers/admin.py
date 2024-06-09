@@ -167,6 +167,6 @@ async def get_logs(token: Annotated[str, Header()]):
         name = f"log_{now.year}-{'%02d' % now.month}-{'%02d' % now.day}.log"
         with open(f'logs/{name}') as file:
             data = file.readlines()
-        return Response(content=''.join(data[:-4]), status_code=200)
+        return ''.join(data[:-4])
     else:
         return Response("Don't have enough rights", status_code=403)

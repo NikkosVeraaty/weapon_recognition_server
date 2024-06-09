@@ -45,8 +45,8 @@ async def auth(user: UserBase):
             logging.info(f"[{user.login}] Password was entered correctly")
             logging.info(f"[{user.login}] Returning the authorization token to the user")
 
-            cur.execute("SELECT Токен FROM Пользователь WHERE Логин = ?", (user.login,))
-            token = cur.fetchone()[0]
+            cur.execute("SELECT Токен, id FROM Пользователь WHERE Логин = ?", (user.login,))
+            token, user_id = cur.fetchone()
 
             cur.close()
             conn.commit()
@@ -73,15 +73,3 @@ async def check_role(token: Annotated[str, Header()]):
         return result
     else:
         return "The token does not exist in the system"
-
-
-@app.get("/custom_response")
-async def custom_response():
-    data = {"key": "value"}
-    byte_data = b"Your byte data here"
-
-    response = Response(content=byte_data)
-    response.headers["Content-Type"] = "application/octet-stream"  # Устанавливаем тип содержимого для байтовых данных
-    response.media = data  # Добавляем JSON объект в атрибут media объекта Response
-
-    return response

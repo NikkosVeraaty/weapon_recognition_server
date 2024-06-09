@@ -1,7 +1,8 @@
 import json
-
+import yaml
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from ultralytics import YOLO
+import numpy as np
 import cv2
 import asyncio
 
@@ -11,6 +12,7 @@ router = APIRouter()
 
 class ConnectionManager:
     model = YOLO('data/neural_models/model_medium.pt')
+    detections = []
 
     def __init__(self):
         self.active_connections: list[WebSocket] = []
@@ -37,8 +39,14 @@ manager = ConnectionManager()
 async def websocket_endpoint(websocket: WebSocket, camera_id: int):
     await asyncio.sleep(camera_id/100)
     await manager.connect(websocket)
+
     try:
         cap = cv2.VideoCapture(camera_id)
+
+        with open('data/config_nn.yaml') as file:
+            data = yaml.safe_load(file)
+            params = data['parameters']
+            classes = np.array([4, 5, 0, 2, 1, 3])[list(data['parameters']['classes'].values())]
 
         frame_counter = 0
         while cap.isOpened():  # Для бесперерывной передачи (запускает заново)
@@ -54,9 +62,17 @@ async def websocket_endpoint(websocket: WebSocket, camera_id: int):
                 # await asyncio.sleep(0.04)
                 continue
 
-            results = manager.model.predict(frame, conf=0.5, device='cpu')
+            results = manager.model.track(source=frame,
+                                          conf=params['conf'],
+                                          iou=params['iou'],
+                                          max_det=params['max_detection'],
+                                          save_crop=params['save_crop'],
+                                          classes=classes,
+                                          device=params['device'])
 
-            annotated_frame = results[0].plot(show=False)
+            annotated_frame = results[0].plot(show=False,
+                                              line_width=params['line_width'],
+                                              filename='data/annotated_imgs')
 
             if len(results[0]) > 0:
                 print(len(results))
@@ -70,47 +86,6 @@ async def websocket_endpoint(websocket: WebSocket, camera_id: int):
                 await websocket.send_json(marks)
 
             ret, buffer = cv2.imencode('.jpg', annotated_frame)
-
-            await websocket.send_bytes(buffer.tobytes())
-
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-
-
-# ret, buffer = cv2.imencode('.jpg', frame)
-
-
-@router.websocket("/ws/{camera_id}")
-async def websocket_endpoint(websocket: WebSocket, camera_id: int):
-    await asyncio.sleep(camera_id/100)
-    await manager.connect(websocket)
-    try:
-        cap = cv2.VideoCapture('video/video1.mp4')
-
-        # print(os.getpid())
-        total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-        frame_counter = 0
-        while True:  # Для бесперерывной передачи (запускает заново)
-            # while cap.isOpened():
-
-            ret, frame = cap.read()
-
-            if not ret:
-                if frame_counter == total_frames:
-                    frame_counter = 0
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
-                else:
-                    break
-
-            frame_counter += 1
-
-            if frame_counter % 3 != 0:
-                await asyncio.sleep(0.04)
-                continue
-
-            # resize_frame = cv2.resize(frame, (390, 210), cv2.INTER_LINEAR)
-            ret, buffer = cv2.imencode('.jpg', frame)
 
             await websocket.send_bytes(buffer.tobytes())
 
